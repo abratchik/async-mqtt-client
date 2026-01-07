@@ -28,9 +28,9 @@ AsyncMqttClient::AsyncMqttClient()
 , _willPayloadLength(0)
 , _willQos(0)
 , _willRetain(false)
-#if ASYNC_TCP_SSL_ENABLED
-, _secureServerFingerprints()
-#endif
+// #if ASYNC_TCP_SSL_ENABLED
+// , _secureServerFingerprints()
+// #endif
 , _onConnectUserCallbacks()
 , _onDisconnectUserCallbacks()
 , _onSubscribeUserCallbacks()
