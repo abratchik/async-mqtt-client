@@ -130,12 +130,12 @@ AsyncMqttClient& AsyncMqttClient::setSecure(bool secure) {
   return *this;
 }
 
-AsyncMqttClient& AsyncMqttClient::addServerFingerprint(const uint8_t* fingerprint) {
-  std::array<uint8_t, SHA1_SIZE> newFingerprint;
-  memcpy(newFingerprint.data(), fingerprint, SHA1_SIZE);
-  _secureServerFingerprints.push_back(newFingerprint);
-  return *this;
-}
+// AsyncMqttClient& AsyncMqttClient::addServerFingerprint(const uint8_t* fingerprint) {
+//   std::array<uint8_t, SHA1_SIZE> newFingerprint;
+//   memcpy(newFingerprint.data(), fingerprint, SHA1_SIZE);
+//   _secureServerFingerprints.push_back(newFingerprint);
+//   return *this;
+// }
 #endif
 
 AsyncMqttClient& AsyncMqttClient::onConnect(AsyncMqttClientInternals::OnConnectUserCallback callback) {
@@ -186,25 +186,25 @@ void AsyncMqttClient::_clear() {
 /* TCP */
 void AsyncMqttClient::_onConnect() {
   log_i("TCP conn, MQTT CONNECT");
-#if ASYNC_TCP_SSL_ENABLED
-  if (_secure && _secureServerFingerprints.size() > 0) {
-    SSL* clientSsl = _client.getSSL();
+// #if ASYNC_TCP_SSL_ENABLED
+//   if (_secure && _secureServerFingerprints.size() > 0) {
+//     SSL* clientSsl = _client.getSSL();
 
-    bool sslFoundFingerprint = false;
-    for (std::array<uint8_t, SHA1_SIZE> fingerprint : _secureServerFingerprints) {
-      if (ssl_match_fingerprint(clientSsl, fingerprint.data()) == SSL_OK) {
-        sslFoundFingerprint = true;
-        break;
-      }
-    }
+//     bool sslFoundFingerprint = false;
+//     for (std::array<uint8_t, SHA1_SIZE> fingerprint : _secureServerFingerprints) {
+//       if (ssl_match_fingerprint(clientSsl, fingerprint.data()) == SSL_OK) {
+//         sslFoundFingerprint = true;
+//         break;
+//       }
+//     }
 
-    if (!sslFoundFingerprint) {
-      _disconnectReason = AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT;
-      _client.close(true);
-      return;
-    }
-  }
-#endif
+//     if (!sslFoundFingerprint) {
+//       _disconnectReason = AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT;
+//       _client.close(true);
+//       return;
+//     }
+//   }
+// #endif
   AsyncMqttClientInternals::OutPacket* msg =
   new AsyncMqttClientInternals::ConnectOutPacket(_cleanSession,
                                                  _username,
