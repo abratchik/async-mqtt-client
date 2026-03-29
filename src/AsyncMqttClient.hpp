@@ -18,10 +18,6 @@
 #error Platform not supported
 #endif
 
-#if ASYNC_TCP_SSL_ENABLED
-// #include <tcp_axtls.h>
-#define SHA1_SIZE 20
-#endif
 
 #include "AsyncMqttClient/Flags.hpp"
 #include "AsyncMqttClient/ParsingInformation.hpp"
@@ -63,9 +59,13 @@ class AsyncMqttClient {
   AsyncMqttClient& setWill(const char* topic, uint8_t qos, bool retain, const char* payload = nullptr, size_t length = 0);
   AsyncMqttClient& setServer(IPAddress ip, uint16_t port);
   AsyncMqttClient& setServer(const char* host, uint16_t port);
+
 #if ASYNC_TCP_SSL_ENABLED
+  AsyncMqttClient& useTLS(bool use_tls);
+
+  // @deprecated use useTlS instead. Will be removed in v1.0.0
   AsyncMqttClient& setSecure(bool secure);
-  // AsyncMqttClient& addServerFingerprint(const uint8_t* fingerprint);
+
 #endif
 
   AsyncMqttClient& onConnect(AsyncMqttClientInternals::OnConnectUserCallback callback);
@@ -106,7 +106,7 @@ class AsyncMqttClient {
   const char* _host;
   bool _useIp;
 #if ASYNC_TCP_SSL_ENABLED
-  bool _secure;
+  bool _use_tls;
 #endif
   uint16_t _port;
   uint16_t _keepAlive;
@@ -119,10 +119,6 @@ class AsyncMqttClient {
   uint16_t _willPayloadLength;
   uint8_t _willQos;
   bool _willRetain;
-
-// #if ASYNC_TCP_SSL_ENABLED
-//   std::vector<std::array<uint8_t, SHA1_SIZE>> _secureServerFingerprints;
-// #endif
 
   std::vector<AsyncMqttClientInternals::OnConnectUserCallback> _onConnectUserCallbacks;
   std::vector<AsyncMqttClientInternals::OnDisconnectUserCallback> _onDisconnectUserCallbacks;

@@ -1,12 +1,19 @@
+
+// Example project for ESP8266 platform, which can be built with SSL enabled or disabled.
+// Refer to platformio.ini for the build configuration and platform installation.
+
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <Ticker.h>
 #include <AsyncMqttClient.h>
 
-#define WIFI_SSID "My_Wi-Fi"
-#define WIFI_PASSWORD "my-awesome-password"
 
-#define MQTT_HOST IPAddress(192, 168, 1, 10)
+#if ASYNC_TCP_SSL_ENABLED
+#define MQTT_USE_TLS true
+#define MQTT_PORT 8883
+#else
 #define MQTT_PORT 1883
+#endif
 
 AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
@@ -55,6 +62,10 @@ void onMqttConnect(bool sessionPresent) {
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
   Serial.println("Disconnected from MQTT.");
+
+  if (reason == AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT) {
+    Serial.println("Bad server fingerprint.");
+  }
 
   if (WiFi.isConnected()) {
     mqttReconnectTimer.once(2, connectToMqtt);
@@ -114,6 +125,9 @@ void setup() {
   mqttClient.onMessage(onMqttMessage);
   mqttClient.onPublish(onMqttPublish);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+#if ASYNC_TCP_SSL_ENABLED
+  mqttClient.useTLS(MQTT_USE_TLS);
+#endif
 
   connectToWifi();
 }

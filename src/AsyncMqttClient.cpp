@@ -15,7 +15,7 @@ AsyncMqttClient::AsyncMqttClient()
 , _host(nullptr)
 , _useIp(false)
 #if ASYNC_TCP_SSL_ENABLED
-, _secure(false)
+, _use_tls(false)
 #endif
 , _port(0)
 , _keepAlive(15)
@@ -28,9 +28,6 @@ AsyncMqttClient::AsyncMqttClient()
 , _willPayloadLength(0)
 , _willQos(0)
 , _willRetain(false)
-// #if ASYNC_TCP_SSL_ENABLED
-// , _secureServerFingerprints()
-// #endif
 , _onConnectUserCallbacks()
 , _onDisconnectUserCallbacks()
 , _onSubscribeUserCallbacks()
@@ -125,17 +122,19 @@ AsyncMqttClient& AsyncMqttClient::setServer(const char* host, uint16_t port) {
 }
 
 #if ASYNC_TCP_SSL_ENABLED
-AsyncMqttClient& AsyncMqttClient::setSecure(bool secure) {
-  _secure = secure;
+
+AsyncMqttClient& AsyncMqttClient::useTLS(bool use_tls) {
+  _use_tls = use_tls;
   return *this;
 }
 
-// AsyncMqttClient& AsyncMqttClient::addServerFingerprint(const uint8_t* fingerprint) {
-//   std::array<uint8_t, SHA1_SIZE> newFingerprint;
-//   memcpy(newFingerprint.data(), fingerprint, SHA1_SIZE);
-//   _secureServerFingerprints.push_back(newFingerprint);
-//   return *this;
-// }
+
+// @deprecated use useTlS instead. Will be removed in v1.0.0
+AsyncMqttClient& AsyncMqttClient::setSecure(bool secure) {
+  _use_tls = secure;
+  return *this;
+}
+
 #endif
 
 AsyncMqttClient& AsyncMqttClient::onConnect(AsyncMqttClientInternals::OnConnectUserCallback callback) {
@@ -186,25 +185,7 @@ void AsyncMqttClient::_clear() {
 /* TCP */
 void AsyncMqttClient::_onConnect() {
   log_i("TCP conn, MQTT CONNECT");
-// #if ASYNC_TCP_SSL_ENABLED
-//   if (_secure && _secureServerFingerprints.size() > 0) {
-//     SSL* clientSsl = _client.getSSL();
 
-//     bool sslFoundFingerprint = false;
-//     for (std::array<uint8_t, SHA1_SIZE> fingerprint : _secureServerFingerprints) {
-//       if (ssl_match_fingerprint(clientSsl, fingerprint.data()) == SSL_OK) {
-//         sslFoundFingerprint = true;
-//         break;
-//       }
-//     }
-
-//     if (!sslFoundFingerprint) {
-//       _disconnectReason = AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT;
-//       _client.close(true);
-//       return;
-//     }
-//   }
-// #endif
   AsyncMqttClientInternals::OutPacket* msg =
   new AsyncMqttClientInternals::ConnectOutPacket(_cleanSession,
                                                  _username,
@@ -228,17 +209,6 @@ void AsyncMqttClient::_onDisconnect() {
 
   for (auto callback : _onDisconnectUserCallbacks) callback(_disconnectReason);
 }
-
-/*
-void AsyncMqttClient::_onError(int8_t error) {
-  (void)error;
-  // _onDisconnect called anyway
-}
-
-void AsyncMqttClient::_onTimeout() {
-  // disconnection will be handled by ping/pong management
-}
-*/
 
 void AsyncMqttClient::_onAck(size_t len) {
   log_i("ack %u", len);
@@ -690,10 +660,14 @@ void AsyncMqttClient::connect() {
   _client.setRxTimeout(_keepAlive);
 
 #if ASYNC_TCP_SSL_ENABLED
+  // for now we support only insecure mode (no server certificate verification)
+  // @todo add options for secure mode.
+  _client.setInsecure();
+
   if (_useIp) {
-    _client.connect(_ip, _port, _secure);
+    _client.connect(_ip, _port, _use_tls);
   } else {
-    _client.connect(_host, _port, _secure);
+    _client.connect(_host, _port, _use_tls);
   }
 #else
   if (_useIp) {
