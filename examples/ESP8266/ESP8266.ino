@@ -29,6 +29,7 @@ void connectToWifi() {
 
 void connectToMqtt() {
   Serial.println("Connecting to MQTT...");
+  mqttClient.setCredentials(MQTT_USERNAME, MQTT_PASSWORD);
   mqttClient.connect();
 }
 

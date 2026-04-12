@@ -216,7 +216,7 @@ void AsyncMqttClient::_onAck(size_t len) {
 }
 
 void AsyncMqttClient::_onData(char* data, size_t len) {
-  log_i("data rcv (%u)", len);
+  log_i("data rcv (%u) @ %lu", len, millis());
   size_t currentBytePosition = 0;
   char currentByte;
   _lastServerActivity = millis();
@@ -229,44 +229,44 @@ void AsyncMqttClient::_onData(char* data, size_t len) {
         _parsingInformation.bufferState = AsyncMqttClientInternals::BufferState::REMAINING_LENGTH;
         switch (_parsingInformation.packetType) {
           case AsyncMqttClientInternals::PacketType.CONNACK:
-            log_i("rcv CONNACK");
+            log_i("rcv CONNACK @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::ConnAckPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onConnAck, this, std::placeholders::_1, std::placeholders::_2));
             _client.setRxTimeout(0);
             break;
           case AsyncMqttClientInternals::PacketType.PINGRESP:
-            log_i("rcv PINGRESP");
+            log_i("rcv PINGRESP @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::PingRespPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onPingResp, this));
             break;
           case AsyncMqttClientInternals::PacketType.SUBACK:
-            log_i("rcv SUBACK");
+            log_i("rcv SUBACK @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::SubAckPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onSubAck, this, std::placeholders::_1, std::placeholders::_2));
             break;
           case AsyncMqttClientInternals::PacketType.UNSUBACK:
-            log_i("rcv UNSUBACK");
+            log_i("rcv UNSUBACK @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::UnsubAckPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onUnsubAck, this, std::placeholders::_1));
             break;
           case AsyncMqttClientInternals::PacketType.PUBLISH:
-            log_i("rcv PUBLISH");
+            log_i("rcv PUBLISH @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::PublishPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6, std::placeholders::_7, std::placeholders::_8, std::placeholders::_9), std::bind(&AsyncMqttClient::_onPublish, this, std::placeholders::_1, std::placeholders::_2));
             break;
           case AsyncMqttClientInternals::PacketType.PUBREL:
-            log_i("rcv PUBREL");
+            log_i("rcv PUBREL @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::PubRelPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onPubRel, this, std::placeholders::_1));
             break;
           case AsyncMqttClientInternals::PacketType.PUBACK:
-            log_i("rcv PUBACK");
+            log_i("rcv PUBACK @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::PubAckPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onPubAck, this, std::placeholders::_1));
             break;
           case AsyncMqttClientInternals::PacketType.PUBREC:
-            log_i("rcv PUBREC");
+            log_i("rcv PUBREC @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::PubRecPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onPubRec, this, std::placeholders::_1));
             break;
           case AsyncMqttClientInternals::PacketType.PUBCOMP:
-            log_i("rcv PUBCOMP");
+            log_i("rcv PUBCOMP @ %lu", millis());
             _currentParsedPacket = new AsyncMqttClientInternals::PubCompPacket(&_parsingInformation, std::bind(&AsyncMqttClient::_onPubComp, this, std::placeholders::_1));
             break;
           default:
-            log_i("rcv PROTOCOL VIOLATION");
+            log_i("rcv PROTOCOL VIOLATION @ %lu", millis());
             disconnect(true);
             break;
         }
@@ -296,6 +296,7 @@ void AsyncMqttClient::_onData(char* data, size_t len) {
         currentBytePosition = len;
     }
   } while (currentBytePosition != len);
+  log_i("data parsing done @ %lu", millis());
 }
 
 void AsyncMqttClient::_onPoll() {
@@ -363,6 +364,7 @@ void AsyncMqttClient::_addBack(AsyncMqttClientInternals::OutPacket* packet) {
 
 void AsyncMqttClient::_handleQueue() {
   SEMAPHORE_TAKE();
+  log_i("_handleQueue enter @ %lu, head: %p", millis(), _head);
   // On ESP32, onDisconnect is called within the close()-call. So we need to make sure we don't lock
   bool disconnect = false;
 
@@ -373,15 +375,17 @@ void AsyncMqttClient::_handleQueue() {
       // So we calculate the amount to be written ourselves.
       size_t willSend = std::min(_head->size() - _sent, _client.space());
       size_t realSent = _client.add(reinterpret_cast<const char*>(_head->data(_sent)), willSend, ASYNC_WRITE_FLAG_COPY);  // flag is set by LWIP anyway, added for clarity
-      _sent += willSend;
+      if (realSent == 0) break;
+      _sent += realSent;
+      // _sent += willSend;
       (void)realSent;
       _client.send();
       _lastClientActivity = millis();
       _lastPingRequestTime = 0;
       #if ASYNC_TCP_SSL_ENABLED
-      log_i("snd #%u: (tls: %u) %u/%u", _head->packetType(), realSent, _sent, _head->size());
+      // log_i("snd #%u: (tls: %u) %u/%u @ %lu", _head->packetType(), realSent, _sent, _head->size(), millis());
       #else
-      log_i("snd #%u: %u/%u", _head->packetType(), _sent, _head->size());
+      // log_i("snd #%u: %u/%u @ %lu", _head->packetType(), _sent, _head->size(), millis());
       #endif
       if (_head->packetType() == AsyncMqttClientInternals::PacketType.DISCONNECT) {
         disconnect = true;
@@ -391,7 +395,7 @@ void AsyncMqttClient::_handleQueue() {
     // 2. stop processing when we have to wait for an MQTT acknowledgment
     if (_head->size() == _sent) {
       if (_head->released()) {
-        log_i("p #%d rel", _head->packetType());
+        // log_i("p #%d rel @ %lu", _head->packetType(), millis());
         AsyncMqttClientInternals::OutPacket* tmp = _head;
         _head = _head->next;
         if (!_head) _tail = nullptr;
@@ -404,8 +408,9 @@ void AsyncMqttClient::_handleQueue() {
   }
 
   SEMAPHORE_GIVE();
+  log_i("_handleQueue exit @ %lu", millis());
   if (disconnect) {
-    log_i("snd DISCONN, disconnecting");
+    log_i("snd DISCONN, disconnecting @ %lu", millis());
     _client.close();
   }
 }
@@ -470,7 +475,11 @@ void AsyncMqttClient::_onPingResp() {
 }
 
 void AsyncMqttClient::_onConnAck(bool sessionPresent, uint8_t connectReturnCode) {
-  log_i("CONNACK");
+  if(_state == CONNECTED) {
+    return;
+  }
+
+  log_i("CONNACK @ %lu", millis());
   _freeCurrentParsedPacket();
 
   if (!sessionPresent) {
@@ -479,15 +488,19 @@ void AsyncMqttClient::_onConnAck(bool sessionPresent, uint8_t connectReturnCode)
     _clearQueue(false);  // remove session data
   }
 
-  if (connectReturnCode == 0) {
+  if (connectReturnCode == 0 ) {
     _state = CONNECTED;
+    log_i("Calling onConnect callbacks @ %lu", millis());
     for (auto callback : _onConnectUserCallbacks) callback(sessionPresent);
+    log_i("onConnect callbacks done @ %lu", millis());
   } else {
     // Callbacks are handled by the onDisconnect function which is called from the AsyncTcp lib
     _disconnectReason = static_cast<AsyncMqttClientDisconnectReason>(connectReturnCode);
     return;
   }
+  log_i("Calling _handleQueue after CONNACK @ %lu", millis());
   _handleQueue();  // send any remaining data from continued session
+  log_i("_handleQueue done @ %lu", millis());
 }
 
 void AsyncMqttClient::_onSubAck(uint16_t packetId, char status) {
